@@ -15,6 +15,14 @@ the in-game menu. Story Mode gameplay not playtested yet.
 - Heroic → Red Dead Redemption 2 → Play. (First Heroic start takes ~2 min.)
 - Without Heroic: `./play-rdr2.py`
 
+## Fullscreen
+Wine on macOS doesn't change the Mac's display mode, so RDR2's fullscreen
+at a smaller resolution (it defaults to 1147x745) shows a small picture in a
+black screen. Use borderless at the desktop resolution: run
+`./fix-display.py` with the game closed, or in-game set Screen Type =
+Windowed Borderless and Resolution = your desktop size (e.g. 1800x1169).
+Don't use the macOS green fullscreen button. Use FSR if FPS drops.
+
 ## Pieces
 - Engine: `~/Library/Application Support/heroic/tools/wine/WineCX24-D3DMetal`
   - Wine 9.0 from CrossOver 24.0.7 sources (Sikarugir `WS12WineCX24.0.7_7`)
