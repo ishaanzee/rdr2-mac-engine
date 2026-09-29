@@ -1,0 +1,4 @@
+# Third-party / built binaries: download or rebuild instead (see README).
+legendary
+*.exe
+*.dll

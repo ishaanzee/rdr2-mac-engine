@@ -1,0 +1,126 @@
+d2d1: Present DC render targets through a staging texture without IDXGISurface1.
+
+DXMT's textures don't implement IDXGISurface1 (GetDC/ReleaseDC), so BindDC()
+stored a NULL surface and EndDraw() crashed dereferencing it. Fall back to
+copying the target into a staging texture and SetDIBitsToDevice() it.
+
+--- a/dlls/d2d1/dc_render_target.c
++++ b/dlls/d2d1/dc_render_target.c
+@@ -24,6 +24,66 @@
+ static inline struct d2d_dc_render_target *impl_from_IUnknown(IUnknown *iface)
+ {
+     return CONTAINING_RECORD(iface, struct d2d_dc_render_target, ID2D1DCRenderTarget_iface);
++}
++
++/* Used when the d3d implementation can't provide an IDXGISurface1 for the
++ * target (e.g. DXMT): read the target back through a staging texture and
++ * blit it to the DC with SetDIBitsToDevice(). */
++static void d2d_dc_render_target_present_readback(struct d2d_dc_render_target *render_target)
++{
++    const RECT *dst_rect = &render_target->dst_rect;
++    D3D11_MAPPED_SUBRESOURCE map_desc;
++    ID3D11DeviceContext *context;
++    ID3D11Texture2D *texture, *staging;
++    D3D11_TEXTURE2D_DESC desc;
++    ID3D11Device *device;
++    BITMAPINFO bmi;
++
++    if (FAILED(ID3D11Resource_QueryInterface(render_target->readback_resource,
++            &IID_ID3D11Texture2D, (void **)&texture)))
++        return;
++
++    ID3D11Texture2D_GetDesc(texture, &desc);
++    desc.MipLevels = 1;
++    desc.ArraySize = 1;
++    desc.SampleDesc.Count = 1;
++    desc.SampleDesc.Quality = 0;
++    desc.Usage = D3D11_USAGE_STAGING;
++    desc.BindFlags = 0;
++    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
++    desc.MiscFlags = 0;
++
++    ID3D11Texture2D_GetDevice(texture, &device);
++    if (FAILED(ID3D11Device_CreateTexture2D(device, &desc, NULL, &staging)))
++    {
++        WARN("Failed to create staging texture.\n");
++        ID3D11Device_Release(device);
++        ID3D11Texture2D_Release(texture);
++        return;
++    }
++
++    ID3D11Device_GetImmediateContext(device, &context);
++    ID3D11DeviceContext_CopyResource(context, (ID3D11Resource *)staging, (ID3D11Resource *)texture);
++    if (SUCCEEDED(ID3D11DeviceContext_Map(context, (ID3D11Resource *)staging, 0, D3D11_MAP_READ, 0, &map_desc)))
++    {
++        memset(&bmi, 0, sizeof(bmi));
++        bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
++        bmi.bmiHeader.biWidth = map_desc.RowPitch / 4;
++        bmi.bmiHeader.biHeight = -(LONG)desc.Height;
++        bmi.bmiHeader.biPlanes = 1;
++        bmi.bmiHeader.biBitCount = 32;
++        bmi.bmiHeader.biCompression = BI_RGB;
++        SetDIBitsToDevice(render_target->hdc, dst_rect->left, dst_rect->top,
++                min(desc.Width, dst_rect->right - dst_rect->left),
++                min(desc.Height, dst_rect->bottom - dst_rect->top),
++                0, 0, 0, desc.Height, map_desc.pData, &bmi, DIB_RGB_COLORS);
++        ID3D11DeviceContext_Unmap(context, (ID3D11Resource *)staging, 0);
++    }
++
++    ID3D11DeviceContext_Release(context);
++    ID3D11Texture2D_Release(staging);
++    ID3D11Device_Release(device);
++    ID3D11Texture2D_Release(texture);
+ }
+ 
+ static HRESULT d2d_dc_render_target_present(IUnknown *outer_unknown)
+@@ -37,6 +97,13 @@
+     if (!render_target->hdc)
+         return D2DERR_WRONG_STATE;
+ 
++    if (!render_target->dxgi_surface)
++    {
++        if (render_target->readback_resource)
++            d2d_dc_render_target_present_readback(render_target);
++        return S_OK;
++    }
++
+     if (FAILED(hr = IDXGISurface1_GetDC(render_target->dxgi_surface, FALSE, &src_hdc)))
+     {
+         WARN("GetDC() failed, %#lx.\n", hr);
+@@ -98,6 +165,8 @@
+         IUnknown_Release(render_target->dxgi_inner);
+         if (render_target->dxgi_surface)
+             IDXGISurface1_Release(render_target->dxgi_surface);
++        if (render_target->readback_resource)
++            ID3D11Resource_Release(render_target->readback_resource);
+         ID3D10Device1_Release(render_target->d3d_device);
+         free(render_target);
+     }
+@@ -739,7 +808,16 @@
+     }
+ 
+     bitmap_impl = unsafe_impl_from_ID2D1Bitmap(bitmap);
+-    ID3D11Resource_QueryInterface(bitmap_impl->resource, &IID_IDXGISurface1, (void **)&dxgi_surface);
++    if (FAILED(ID3D11Resource_QueryInterface(bitmap_impl->resource, &IID_IDXGISurface1, (void **)&dxgi_surface)))
++        dxgi_surface = NULL;
++    if (render_target->readback_resource)
++        ID3D11Resource_Release(render_target->readback_resource);
++    render_target->readback_resource = NULL;
++    if (!dxgi_surface)
++    {
++        WARN("IDXGISurface1 not available, presenting through a staging texture.\n");
++        ID3D11Resource_AddRef(render_target->readback_resource = bitmap_impl->resource);
++    }
+ 
+     ID2D1DeviceContext_SetTarget(context, (ID2D1Image *)bitmap);
+     ID2D1Bitmap_Release(bitmap);
+--- a/dlls/d2d1/d2d1_private.h
++++ b/dlls/d2d1/d2d1_private.h
+@@ -244,6 +244,7 @@
+     LONG refcount;
+ 
+     IDXGISurface1 *dxgi_surface;
++    ID3D11Resource *readback_resource;
+     ID3D10Device1 *d3d_device;
+     ID2D1RenderTarget *dxgi_target;
+     IUnknown *dxgi_inner;

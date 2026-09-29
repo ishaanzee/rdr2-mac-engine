@@ -1,0 +1,28 @@
+user32: Add IsWindowArranged stub (Windows 11 API).
+
+Chromium/CEF (Rockstar Social Club) delay-loads it and deliberately crashes
+when it's missing. Wine never snaps windows, so FALSE is the right answer.
+
+--- a/dlls/user32/user32.spec
++++ b/dlls/user32/user32.spec
+@@ -488,2 +488,3 @@
+ @ stdcall IsWindow(long)
++@ stdcall IsWindowArranged(long)
+ @ stdcall IsWindowEnabled(long)
+--- a/dlls/user32/win.c
++++ b/dlls/user32/win.c
+@@ -592,2 +592,13 @@
+ 
+ /***********************************************************************
++ *		IsWindowArranged (USER32.@)
++ */
++BOOL WINAPI IsWindowArranged( HWND hwnd )
++{
++    static int once;
++
++    if (!once++) FIXME( "hwnd %p stub!\n", hwnd );
++    return FALSE;
++}
++
++/***********************************************************************
+  *		IsWindowEnabled (USER32.@)
