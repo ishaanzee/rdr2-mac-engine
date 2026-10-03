@@ -1,7 +1,7 @@
 # RDR2 (Epic) on Apple Silicon — custom engine
 
-Status (2026-09-29): launches from Heroic, auto-signs in to Rockstar, reaches
-the in-game menu. Story Mode gameplay not playtested yet.
+Status (2026-10-03): works. Launches from Heroic, auto-signs in to Rockstar,
+and the game is playable on Apple Silicon.
 
 ## Setup (files not in git)
 - `make` — builds `SocialClubHelper-wrapper.exe` (needs `brew install mingw-w64`)
