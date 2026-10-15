@@ -1,6 +1,9 @@
 #!/bin/bash
 # Heroic "before launch" script for RDR2 on the WineCX24-D3DMetal engine.
 #
+# Also starts fit-fullscreen.sh, which keeps the Fullscreen window covering
+# the screen at non-desktop resolutions (see src/fit-fullscreen.c).
+#
 # Social Club updates replace SocialClubHelper.exe with Rockstar's original,
 # which would drop our wrapper (--no-sandbox, occlusion off, ANGLE/D3D11) and
 # bring back the blank sign-in window. Put the wrapper back if that happened.
@@ -9,6 +12,9 @@ ENGINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 PREFIX="$HOME/Games/Heroic/Prefixes/Red Dead Redemption 2 (CX24)"
 SC="$PREFIX/drive_c/Program Files/Rockstar Games/Social Club"
 WRAPPER="$ENGINE_DIR/SocialClubHelper-wrapper.exe"
+
+pkill -f "$ENGINE_DIR/fit-fullscreen.sh" 2>/dev/null
+nohup "$ENGINE_DIR/fit-fullscreen.sh" >/dev/null 2>&1 &
 
 [ -f "$SC/SocialClubHelper.exe" ] || exit 0
 [ -f "$WRAPPER" ] || { echo "before-launch: $WRAPPER missing, run make" >&2; exit 1; }

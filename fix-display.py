@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Make RDR2 fill the screen on macOS: borderless window at the desktop size.
+"""Reset RDR2 to a borderless window at the desktop size.
 
-Wine on macOS doesn't switch the Mac's display mode, so a fullscreen
-resolution smaller than the desktop (RDR2 picks the first mode, e.g.
-1147x745) renders small inside a black screen. Borderless at the desktop
-resolution avoids the mode switch entirely.
+Fullscreen at other resolutions works too (see fit-fullscreen.exe), but
+borderless at the desktop size avoids display mode switches entirely.
 
 Run with the game closed (RDR2 rewrites system.xml on exit).
 usage: fix-display.py [WIDTHxHEIGHT]   (default: current desktop size)

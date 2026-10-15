@@ -4,7 +4,8 @@ Status (2026-10-03): works. Launches from Heroic, auto-signs in to Rockstar,
 and the game is playable on Apple Silicon.
 
 ## Setup (files not in git)
-- `make` — builds `SocialClubHelper-wrapper.exe` (needs `brew install mingw-w64`)
+- `make` — builds `SocialClubHelper-wrapper.exe` and `fit-fullscreen.exe`
+  (needs `brew install mingw-w64`)
 - legendary 0.21.1: download `legendary_macOS.zip` from
   https://legendary.gl/release/0.21.1, put `legendary_macOS_arm64` here as
   `legendary`
@@ -15,13 +16,23 @@ and the game is playable on Apple Silicon.
 - Heroic → Red Dead Redemption 2 → Play. (First Heroic start takes ~2 min.)
 - Without Heroic: `./play-rdr2.py`
 
-## Fullscreen
-Wine on macOS doesn't change the Mac's display mode, so RDR2's fullscreen
-at a smaller resolution (it defaults to 1147x745) shows a small picture in a
-black screen. Use borderless at the desktop resolution: run
-`./fix-display.py` with the game closed, or in-game set Screen Type =
-Windowed Borderless and Resolution = your desktop size (e.g. 1800x1169).
-Don't use the macOS green fullscreen button. Use FSR if FPS drops.
+## Screen type
+All three in-game Screen Types work (tested 2026-10-14 via Heroic):
+- Fullscreen: any resolution. Below the desktop size the Mac switches display
+  mode while the game is in front and switches back when you Cmd-Tab away.
+- Windowed Borderless: always covers the screen at the desktop size.
+- Windowed: a normal Mac window at the chosen size.
+
+Why fullscreen needed help: Wine's Mac driver only switches the display mode
+while Wine is the active app; otherwise it defers it until you click into the
+game. RDR2 starts in the background (Heroic is in front), so DXGI sizes the
+window to the old desktop at an offset (1800x1169 at 260,184 for 1280x800)
+and nothing resizes it after the switch, which shows a cropped corner.
+`fit-fullscreen.exe` (src/fit-fullscreen.c), started by `before-launch.sh` via
+`fit-fullscreen.sh`, keeps a caption-less game window covering its monitor.
+
+`./fix-display.py` (game closed) still resets to borderless at the desktop
+size. Don't use the macOS green fullscreen button. Use FSR if FPS drops.
 
 ## Pieces
 - Engine: `~/Library/Application Support/heroic/tools/wine/WineCX24-D3DMetal`
@@ -46,7 +57,7 @@ Don't use the macOS green fullscreen button. Use FSR if FPS drops.
   EpicGamesLauncher.exe; Rockstar only hands off to the game when the Epic
   launcher is its parent.
 - `before-launch.sh` (Heroic before-launch script): reinstalls the wrapper if a
-  Social Club update overwrote it.
+  Social Club update overwrote it, and starts `fit-fullscreen.sh`.
 
 ## Don't
 - Enable DXVK / change the Wine version in Heroic for this game (overwrites the
